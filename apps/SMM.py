@@ -98,7 +98,7 @@ def instantaneous_power(power_kw):
     """
     瞬時電力計測値の表示
     """
-    (x, y, w, h) = (74, 3, 83, 25)
+    (x, y, w, h) = (73, 3, 84, 25)
     lcd.rect(x, y, w, h, bgcolor, bgcolor)
 
     power_kw = str(int(power_kw))
@@ -112,7 +112,7 @@ def collect_range(collect, update):
     """
     今月（検針日を起点）の日付範囲を表示
     """
-    (x, y, w, h) = (3, 33, 177, 10)
+    (x, y, w, h) = (3, 33, 177, 12)
     lcd.rect(x, y, w, h, bgcolor, bgcolor)
 
     s = '{}~{}'.format(collect[5:10], update[5:10])
@@ -138,7 +138,7 @@ def monthly_fee(fee):
     """
     今月（検針日を起点）の電気料金の表示
     """
-    (x, y, w, h) = (74, 45, 83, 35)
+    (x, y, w, h) = (73, 45, 84, 35)
     lcd.rect(x, y, w, h, bgcolor, bgcolor)
 
     fee = str(int(fee))
