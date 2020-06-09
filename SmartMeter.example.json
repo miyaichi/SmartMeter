@@ -1,0 +1,11 @@
+{
+  "id": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "password": "XXXXXXXXXXXX",
+  "contract_amperage": "",
+  "collect_date": "",
+  "charge_func": "",
+  "ambient": {
+    "channel_id": "XXXXX",
+    "write_key": "XXXXXXXXXXXXXXXX"
+  }
+}
