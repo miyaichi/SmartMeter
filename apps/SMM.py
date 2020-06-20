@@ -1,5 +1,6 @@
 from m5stack import *
 import logging
+import machine
 import ujson
 import utime
 import _thread
@@ -245,6 +246,14 @@ if __name__ == '__main__':
                                         result.status_code)
             except Exception as e:
                 logger.error(e)
+
+        # Ping every 1 hour
+        if t % 3600 == 0:
+            try:
+                bp35a1.skPing()
+
+            except Exception as e:
+                machine.reset()
 
         if not wifiCfg.isconnected():
             wifiCfg.connect()

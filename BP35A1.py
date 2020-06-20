@@ -231,6 +231,15 @@ class BP35A1:
                 return True
 
     @skfunc
+    def skPing(self):
+        self.writeln('SKPING ' + self.ipv6_addr)
+        while True:
+            ln = self.readln()
+            val = ln.decode().strip()
+            if val.startswith('EPONG'):
+                return True
+
+    @skfunc
     def skJoin(self):
         self.writeln('SKJOIN ' + self.ipv6_addr)
         while True:
