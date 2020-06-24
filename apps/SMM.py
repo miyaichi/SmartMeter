@@ -20,16 +20,16 @@ ambient_client = None  # Ambient instance
 
 # Colormap (tab10)
 colormap = (
-    0x1f77b4,
-    0xff7f0e,
-    0x2ca02c,
-    0xd62728,
-    0x9467bd,
-    0x8c564b,
-    0xe377c2,
-    0x7f7f7f,
-    0xbcbd22,
-    0x17becf,
+    0x1f77b4,  # tab:blue
+    0xff7f0e,  # tab:orange
+    0x2ca02c,  # tab:green
+    0xd62728,  # tab:red
+    0x9467bd,  # tab:purple
+    0x8c564b,  # tab:brown
+    0xe377c2,  # tab:pink
+    0x7f7f7f,  # tab:gray
+    0xbcbd22,  # tab:olive
+    0x17becf,  # tab:cyan
 )
 bgcolor = 0x000000  # Background color
 uncolor = 0xa9a9a9  # Unit color
@@ -255,8 +255,10 @@ if __name__ == '__main__':
             except Exception as e:
                 machine.reset()
 
+        # WiFi connection check / reconnect
         if not wifiCfg.isconnected():
-            wifiCfg.connect()
+            if not wifiCfg.reconnect():
+                machine.reset()
 
         utime.sleep(1)
         t = utime.time()
