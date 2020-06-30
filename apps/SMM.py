@@ -17,6 +17,7 @@ orient = lcd.LANDSCAPE_FLIP  # Display orientation
 logger = None  # Logger object
 logger_name = 'SMM'  # Logger name
 ambient_client = None  # Ambient instance
+max_retries = 10  # Maximum number of times to retry
 
 # Colormap (tab10)
 colormap = (
@@ -150,117 +151,133 @@ def monthly_fee(fee):
 
 
 if __name__ == '__main__':
-    # Initialize logger
-    logger = logging.getLogger(logger_name)
-    logger.setLevel(level)
+    try:
+        # Initialize logger
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(level)
 
-    # Initialize lcd
-    lcd.orient(orient)
-    lcd.clear()
+        # Initialize lcd
+        lcd.orient(orient)
+        lcd.clear()
 
-    # Start button thread
-    btnA.wasPressed(buttonA)
+        # Start button thread
+        btnA.wasPressed(buttonA)
 
-    # Connecting Wi-Fi
-    status('Connecting Wi-Fi')
-    wifiCfg.autoConnect(lcdShow=False)
+        # Connecting Wi-Fi
+        status('Connecting Wi-Fi')
+        wifiCfg.autoConnect(lcdShow=False)
+        if not wifiCfg.isconnected():
+            raise Exception('Can not connect to WiFi.')
 
-    # Set Timet
-    status('Set Time')
-    ntptime.settime()
+        # Set Timet
+        status('Set Time')
+        ntptime.settime()
 
-    # Load configuration
-    status('Load configuration')
-    config_file = '/flash/SmartMeter.json'
-    with open(config_file) as f:
-        config = ujson.load(f)
+        # Load configuration
+        status('Load configuration')
+        config_file = '/flash/SmartMeter.json'
+        with open(config_file) as f:
+            config = ujson.load(f)
+        for key in [
+                'id', 'password', 'contract_amperage', 'collect_date',
+                'charge_func'
+        ]:
+            if key not in config:
+                raise Exception('{} is not defined in config.json'.format(key))
+        if 'ambient' in config:
+            for key in ['channel_id', 'write_key']:
+                if key not in config['ambient']:
+                    raise Exception(
+                        '{} is not defined in config.json'.format(key))
 
-    # Create objects
-    status('Create objects')
-    bp35a1 = BP35A1(config['id'],
-                    config['password'],
-                    config['contract_amperage'],
-                    config['collect_date'],
-                    progress_func=progress,
-                    logger_name=logger_name)
-    logger.info('BP35A1 config: (%s, %s, %s, %s)', config['id'],
-                config['password'], config['contract_amperage'],
-                config['collect_date'])
-    charge = eval('charge.{}'.format(config['charge_func']))
-    logger.info('charge function: %s', charge.__name__)
-    if 'ambient' in config:
-        import ambient
-        if 'channel_id' in config['ambient'] and 'write_key' in config[
-                'ambient']:
+        # Create objects
+        status('Create objects')
+        bp35a1 = BP35A1(config['id'],
+                        config['password'],
+                        config['contract_amperage'],
+                        config['collect_date'],
+                        progress_func=progress,
+                        logger_name=logger_name)
+        logger.info('BP35A1 config: (%s, %s, %s, %s)', config['id'],
+                    config['password'], config['contract_amperage'],
+                    config['collect_date'])
+        charge = eval('charge.{}'.format(config['charge_func']))
+        logger.info('charge function: %s', charge.__name__)
+        if 'ambient' in config:
+            import ambient
             ambient_client = ambient.Ambient(config['ambient']['channel_id'],
                                              config['ambient']['write_key'])
             logger.info('Ambient config: (%s, %s)',
                         config['ambient']['channel_id'],
                         config['ambient']['write_key'])
 
-    # Connecting to Smart Meter
-    status('Connecting SmartMeter')
-    (channel, pan_id, mac_addr, lqi) = bp35a1.open()
-    logger.info('Connected. BP35A1 info: (%s, %s, %s, %s)', channel, pan_id,
-                mac_addr, lqi)
+        # Connecting to Smart Meter
+        status('Connecting SmartMeter')
+        (channel, pan_id, mac_addr, lqi) = bp35a1.open()
+        logger.info('Connected. BP35A1 info: (%s, %s, %s, %s)', channel,
+                    pan_id, mac_addr, lqi)
 
-    # Start monitoring
-    status('Start monitoring')
-    amperage = power_kw = power_kwh = amount = 0
-    update = collect = 'YYYY-MM-DD hh:mm:ss'
-    t = 0
-    while True:
-        # Updated every 10 seconds
-        if t % 10 == 0:
-            try:
-                (_, amperage) = bp35a1.instantaneous_amperage()
-                (update, power_kw) = bp35a1.instantaneous_power()
-                instantaneous_amperage(amperage)
-                instantaneous_power(power_kw)
-            except Exception as e:
-                logger.error(e)
+        # Start monitoring
+        status('Start monitoring')
+        amperage = power_kw = power_kwh = amount = 0
+        update = collect = 'YYYY-MM-DD hh:mm:ss'
+        retries = 0
+        t = 0
+        while retries < max_retries:
+            # Updated every 10 seconds
+            if t % 10 == 0:
+                try:
+                    (_, amperage) = bp35a1.instantaneous_amperage()
+                    (update, power_kw) = bp35a1.instantaneous_power()
+                    instantaneous_amperage(amperage)
+                    instantaneous_power(power_kw)
+                except Exception as e:
+                    logger.error(e)
+                    retries += 1
 
-        # Updated every 60 seconds
-        if t % 60 == 0:
-            try:
-                (collect, power_kwh) = bp35a1.monthly_power()
-                amount = charge(config['contract_amperage'], power_kwh)
-                collect_range(collect, update)
-                monthly_power(power_kwh)
-                monthly_fee(amount)
-            except Exception as e:
-                logger.error(e)
+            # Updated every 60 seconds
+            if t % 60 == 0:
+                try:
+                    (collect, power_kwh) = bp35a1.monthly_power()
+                    amount = charge(config['contract_amperage'], power_kwh)
+                    collect_range(collect, update)
+                    monthly_power(power_kwh)
+                    monthly_fee(amount)
+                except Exception as e:
+                    logger.error(e)
+                    retries += 1
 
-        # Send every 30 seconds
-        if t % 30 == 0:
-            try:
-                if ambient_client:
-                    result = ambient_client.send({
-                        'd1': amperage,
-                        'd2': power_kw,
-                        'd3': power_kwh,
-                        'd4': amount
-                    })
-                    if result.status_code != 200:
-                        raise Exception('ambient.send() failed. status: %s',
-                                        result.status_code)
-            except Exception as e:
-                logger.error(e)
+            # Send every 30 seconds
+            if t % 30 == 0:
+                try:
+                    if ambient_client:
+                        result = ambient_client.send({
+                            'd1': amperage,
+                            'd2': power_kw,
+                            'd3': power_kwh,
+                            'd4': amount
+                        })
+                        if result.status_code != 200:
+                            raise Exception(
+                                'ambient.send() failed. status: %s',
+                                result.status_code)
+                except Exception as e:
+                    logger.error(e)
+                    retries += 1
 
-        # Ping every 1 hour
-        if t % 3600 == 0:
-            try:
+            # Ping every 1 hour
+            if t % 3600 == 0:
                 bp35a1.skPing()
 
-            except Exception as e:
-                machine.reset()
+            # WiFi connection check / reconnect
+            if not wifiCfg.isconnected():
+                if not wifiCfg.reconnect():
+                    break
 
-        # WiFi connection check / reconnect
-        if not wifiCfg.isconnected():
-            if not wifiCfg.reconnect():
-                machine.reset()
+            utime.sleep(1)
+            t = utime.time()
 
-        utime.sleep(1)
-        t = utime.time()
+        _thread.exit()
 
-    _thread.exit()
+    finally:
+        machine.reset()
