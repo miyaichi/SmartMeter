@@ -17,7 +17,7 @@ orient = lcd.LANDSCAPE_FLIP  # Display orientation
 logger = None  # Logger object
 logger_name = 'SMM'  # Logger name
 ambient_client = None  # Ambient instance
-max_retries = 10  # Maximum number of times to retry
+max_retries = 30  # Maximum number of times to retry
 
 # Colormap (tab10)
 colormap = (
@@ -231,6 +231,7 @@ if __name__ == '__main__':
                     (update, power_kw) = bp35a1.instantaneous_power()
                     instantaneous_amperage(amperage)
                     instantaneous_power(power_kw)
+                    retries = 0
                 except Exception as e:
                     logger.error(e)
                     retries += 1
@@ -243,6 +244,7 @@ if __name__ == '__main__':
                     collect_range(collect, update)
                     monthly_power(power_kwh)
                     monthly_fee(amount)
+                    retries = 0
                 except Exception as e:
                     logger.error(e)
                     retries += 1
@@ -261,6 +263,7 @@ if __name__ == '__main__':
                             raise Exception(
                                 'ambient.send() failed. status: %s',
                                 result.status_code)
+                        retries = 0
                 except Exception as e:
                     logger.error(e)
                     retries += 1
