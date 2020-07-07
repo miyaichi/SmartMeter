@@ -3,7 +3,6 @@ import logging
 import machine
 import ujson
 import utime
-import _thread
 import ntptime
 import wifiCfg
 import charge
@@ -50,6 +49,16 @@ def buttonA():
     logger.info('Set screen orient: %s', orient)
     lcd.orient(orient)
     lcd.clear()
+
+
+def checkWiFi():
+    """
+    WiFi接続チェック
+    """
+    if not wifiCfg.isconnected():
+        logger.warn('Reconnect to WiFi')
+        if not wifiCfg.reconnect():
+            machine.reset()
 
 
 def status(message):
@@ -169,7 +178,12 @@ if __name__ == '__main__':
         if not wifiCfg.isconnected():
             raise Exception('Can not connect to WiFi.')
 
-        # Set Timet
+        # Start checking the WiFi connection
+        machine.Timer(0).init(period=60 * 1000,
+                              mode=machine.Timer.PERIODIC,
+                              callback=checkWiFi)
+
+        # Set Time
         status('Set Time')
         ntptime.settime()
 
@@ -272,15 +286,8 @@ if __name__ == '__main__':
             if t % 3600 == 0:
                 bp35a1.skPing()
 
-            # WiFi connection check / reconnect
-            if not wifiCfg.isconnected():
-                if not wifiCfg.reconnect():
-                    break
-
             utime.sleep(1)
             t = utime.time()
-
-        _thread.exit()
 
     finally:
         machine.reset()
